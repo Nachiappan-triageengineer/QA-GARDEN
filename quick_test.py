@@ -31,6 +31,6 @@ if "llm_prompt" in result:
 else:
     print("\n[PASS] llm_prompt has been successfully removed!")
 
-print(f"\nError Line Number: {result.get('error_line_number')}")
-print(f"Severity: {result.get('severity')}")
-print(f"Category: {result.get('category')}")
+print(f"\nError Line: {result.get('error_line')}")
+print(f"Playwright Script: {result.get('playwright_script')}")
+print(f"Status: {result.get('status')}")

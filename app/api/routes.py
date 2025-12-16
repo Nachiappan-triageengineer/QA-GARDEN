@@ -23,11 +23,10 @@ def triage_failure(payload: FailureInput):
     except Exception as e:
         # Fallback so the API never crashes with 500
         return TriageOutput(
-            bug_title="API Internal Error",
-            bug_description=f"Error while processing triage request: {str(e)}",
-            triage_label="triage_error",
-            triage_confidence=0.0,
+            title="API Internal Error",
+            description=f"Error while processing triage request: {str(e)}",
             raw_failure_text="",
+            status="failed",
         )
 
 

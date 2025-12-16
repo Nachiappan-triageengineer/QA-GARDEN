@@ -1,7 +1,12 @@
 from typing import Any, Dict, Optional, List, Tuple
+import os
 
 from app.services.ollama_service import generate_bug_report
 from app.schemas import FailureInput
+from app.utils.url_utils import format_file_url_with_line, extract_test_url_from_logs
+
+
+
 
 
 def _extract_error_message(failure_text: str) -> str:
@@ -285,32 +290,124 @@ Logs: {payload.logs}
     import os
     suite_name = os.path.splitext(os.path.basename(payload.file_path))[0] if payload.file_path else None
     
-    # Extract error_line_number from stack trace using regex
+    # Extract error_line_number from stack trace using regex with FALLBACK logic
     import re
     error_line_number = None
+    
+    # Try extracting from stack trace first
     if payload.stack_trace:
         # Try patterns: "line XXX", ":XXX:", ":XXX)", "at file.py:XXX"
         line_match = re.search(r'line\s+(\d+)', payload.stack_trace, re.IGNORECASE)
         if not line_match:
-            line_match = re.search(r':(\d+)[:)]', payload.stack_trace)
+            # Look for file.py:123 pattern (more specific)
+            line_match = re.search(r'\.(py|js|ts|jsx|tsx):(\d+)', payload.stack_trace)
+            if line_match:
+                error_line_number = int(line_match.group(2))
+        if not line_match:
+            line_match = re.search(r':(\d+)\)', payload.stack_trace)
         if not line_match:
             line_match = re.search(r'at\s+[^\s]+:(\d+)', payload.stack_trace)
+        if line_match and error_line_number is None:
+            error_line_number = int(line_match.group(1))
+    
+    # FALLBACK 1: Try extracting from error_message if stack trace didn't work
+    if error_line_number is None and payload.error_message:
+        line_match = re.search(r'line\s+(\d+)', payload.error_message, re.IGNORECASE)
+        if not line_match:
+            # Look for file.py:123 pattern
+            line_match = re.search(r'\.(py|js|ts|jsx|tsx):(\d+)', payload.error_message)
+            if line_match:
+                error_line_number = int(line_match.group(2))
+        if not line_match:
+            line_match = re.search(r':(\d+)\)', payload.error_message)
+        if line_match and error_line_number is None:
+            error_line_number = int(line_match.group(1))
+    
+    # FALLBACK 2: Try extracting from logs if still not found (but avoid timestamps)
+    if error_line_number is None and payload.logs:
+        # Only look for "line XXX" pattern in logs to avoid timestamp confusion
+        line_match = re.search(r'line\s+(\d+)', payload.logs, re.IGNORECASE)
         if line_match:
             error_line_number = int(line_match.group(1))
     
-    # Extract error_file_path from stack trace
-    error_file_path = None
-    if payload.stack_trace:
-        # Look for patterns like "at file.py:line" or "File \"file.py\""
-        file_match = re.search(r'at\s+([^\s:]+\.(?:py|js|ts|spec\.js|spec\.ts))', payload.stack_trace)
-        if not file_match:
-            file_match = re.search(r'File\s+"([^"]+)"', payload.stack_trace)
-        if file_match:
-            error_file_path = file_match.group(1)
+    # Validate extracted line number (should be reasonable, not from timestamp)
+    if error_line_number is not None and error_line_number > 10000:
+        error_line_number = None  # Likely a false positive
     
-    # FALLBACK: If stack trace is empty or didn't contain file path, use file_path from payload
+    # FALLBACK 3: Default to line 1 if still not found (ALWAYS populate)
+    if error_line_number is None:
+        error_line_number = 1
+    
+    # Extract error_file_path from stack trace with FALLBACK logic
+    error_file_path = None
+    
+    # Try extracting from stack trace first
+    if payload.stack_trace:
+        # PRIORITY 1: Look for test files specifically (test_*.py, *_test.py, *.spec.js, *.test.js)
+        test_file_match = re.search(r'(test_[^\s]+\.(?:py|js|ts)|[^\s]+_test\.(?:py|js|ts)|[^\s]+\.spec\.(?:js|ts)|[^\s]+\.test\.(?:js|ts))', payload.stack_trace, re.IGNORECASE)
+        if test_file_match:
+            error_file_path = test_file_match.group(1)
+        
+        # PRIORITY 2: Look for File "path" pattern
+        if not error_file_path:
+            file_match = re.search(r'File\s+"([^"]+)"', payload.stack_trace)
+            if file_match:
+                error_file_path = file_match.group(1)
+        
+        # PRIORITY 3: Look for "at file.py:line" pattern
+        if not error_file_path:
+            file_match = re.search(r'at\s+([^\s:]+\.(?:py|js|ts|spec\.js|spec\.ts))', payload.stack_trace)
+            if file_match:
+                error_file_path = file_match.group(1)
+        
+        # PRIORITY 4: Generic file pattern (but avoid __init__.py)
+        if not error_file_path:
+            # Find all matching files
+            all_files = re.findall(r'([^\s]+\.(?:py|js|ts|jsx|tsx|spec\.js|spec\.ts))', payload.stack_trace)
+            # Filter out __init__.py and prioritize test files
+            for file in all_files:
+                if '__init__.py' not in file:
+                    error_file_path = file
+                    break
+    
+    # FALLBACK 1: Try extracting from error_message if stack trace didn't work
+    if not error_file_path and payload.error_message:
+        # Look for test files first
+        test_file_match = re.search(r'(test_[^\s]+\.(?:py|js|ts)|[^\s]+_test\.(?:py|js|ts)|[^\s]+\.spec\.(?:js|ts))', payload.error_message, re.IGNORECASE)
+        if test_file_match:
+            error_file_path = test_file_match.group(1)
+        
+        if not error_file_path:
+            file_match = re.search(r'File\s+"([^"]+)"', payload.error_message)
+            if not file_match:
+                file_match = re.search(r'([^\s]+\.(?:py|js|ts|jsx|tsx|spec\.js|spec\.ts))', payload.error_message)
+            if file_match:
+                error_file_path = file_match.group(1)
+    
+    # FALLBACK 2: Try extracting from logs if still not found
+    if not error_file_path and payload.logs:
+        # Look for test files first
+        test_file_match = re.search(r'(test_[^\s]+\.(?:py|js|ts)|[^\s]+_test\.(?:py|js|ts)|[^\s]+\.spec\.(?:js|ts))', payload.logs, re.IGNORECASE)
+        if test_file_match:
+            error_file_path = test_file_match.group(1)
+        
+        if not error_file_path:
+            file_match = re.search(r'File\s+"([^"]+)"', payload.logs)
+            if not file_match:
+                file_match = re.search(r'([^\s]+\.(?:py|js|ts|jsx|tsx|spec\.js|spec\.ts))', payload.logs)
+            if file_match:
+                error_file_path = file_match.group(1)
+    
+    # FALLBACK 3: Use file_path from payload if still not found
     if not error_file_path and payload.file_path:
         error_file_path = payload.file_path
+    
+    # FALLBACK 4: Use test_name as file path if everything else failed (ALWAYS populate)
+    if not error_file_path:
+        if payload.test_name:
+            error_file_path = f"{payload.test_name}.unknown"
+        else:
+            error_file_path = "unknown_test_file"
     
     # Truncate stack_trace to max 3000 characters
     stack_trace_truncated = payload.stack_trace[:3000] if payload.stack_trace else None
@@ -376,26 +473,33 @@ Logs: {payload.logs}
     # Extract bug title and description for return
     bug_title = bug.get("title", "No title")
     bug_description = bug.get("description", "No description")
+    
+    # Convert file path to clickable URL with line number anchor
+    # Use playwright_script_url from payload if provided, otherwise auto-generate
+    if payload.playwright_script_url:
+        playwright_script_url = payload.playwright_script_url
+    else:
+        playwright_script_url = format_file_url_with_line(error_file_path, error_line_number) if error_file_path else None
+
+    # Extract test URL (the URL of the page being tested)
+    test_url = None
+    # Priority 1: Use test_url from payload if provided
+    if payload.test_url:
+        test_url = payload.test_url
+    # Priority 2: Extract from logs
+    elif payload.logs:
+        test_url = extract_test_url_from_logs(payload.logs)
+    # Priority 3: Extract from error message as fallback
+    elif payload.error_message:
+        test_url = extract_test_url_from_logs(payload.error_message)
 
     return {
-        "bug_title": bug_title,
-        "bug_description": bug_description,
-        "triage_label": triage["label"],
-        "triage_confidence": triage["confidence"],
+        "title": bug_title,
+        "description": bug_description,
         "raw_failure_text": failure_text,
-        # Extra structured fields
-        "test_name": payload.test_name,
-        "failure_reason": failure_reason,
-        "suite_name": suite_name,
-        "error_file_path": error_file_path,
         "stack_trace": stack_trace_truncated,
-        "error_line_number": error_line_number,
-        "browser": None,
-        "environment": None,
-        "log_snippet": log_snippet,
-        "category": category,
-        "severity": severity,
-        "is_flaky": is_flaky,
-        "flakiness_reasons": flakiness_reasons,
-        "timestamp": timestamp,
+        "status": "failed",
+        "error_line": error_line_number,
+        "playwright_script": playwright_script_url,
+        "test_url": test_url,
     }

@@ -31,9 +31,9 @@ payload1 = FailureInput(
 
 try:
     result1 = process_failure(payload1)
-    print(f"Extracted Line Number: {result1.get('error_line_number')}")
+    print(f"Extracted Line Number: {result1.get('error_line')}")
     print(f"Stack Trace: {payload1.stack_trace[:50]}...")
-    print(f"Extracted File Path: {result1.get('error_file_path')}")
+    print(f"Extracted File Path: {result1.get('playwright_script')}")
     print()
 except Exception as e:
     print(f"Error (likely Ollama not running): {str(e)[:100]}")
@@ -55,9 +55,9 @@ payload2 = FailureInput(
 
 try:
     result2 = process_failure(payload2)
-    print(f"Extracted Line Number: {result2.get('error_line_number')}")
+    print(f"Extracted Line Number: {result2.get('error_line')}")
     print(f"Stack Trace: {payload2.stack_trace[:60]}...")
-    print(f"Extracted File Path: {result2.get('error_file_path')}")
+    print(f"Extracted File Path: {result2.get('playwright_script')}")
     print()
 except Exception as e:
     print(f"Error (likely Ollama not running): {str(e)[:100]}")

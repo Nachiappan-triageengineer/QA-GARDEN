@@ -13,29 +13,19 @@ class FailureInput(BaseModel):
     llm_model: str                       # e.g. "gemma:2b"
     bert_url: str                        # e.g. "http://localhost:8001/triage"
     labels: Optional[List[str]] = None   # optional list of labels
+    test_url: Optional[str] = None       # optional URL of the page being tested (e.g., "https://example.com/login")
+    playwright_script_url: Optional[str] = None  # optional playwright script URL (e.g., "file:///C:/tests/login.spec.js#L25")
 
 
 class TriageOutput(BaseModel):
-    bug_title: str
-    bug_description: str
-    triage_label: str
-    triage_confidence: float
+    title: str
+    description: str
     raw_failure_text: str
-    # Extra structured fields
-    test_name: Optional[str] = None
-    failure_reason: Optional[str] = None
-    suite_name: Optional[str] = None
-    error_file_path: Optional[str] = None
     stack_trace: Optional[str] = None
-    error_line_number: Optional[int] = None
-    browser: Optional[str] = None
-    environment: Optional[str] = None
-    log_snippet: Optional[str] = None
-    category: Optional[str] = None
-    severity: Optional[str] = None
-    is_flaky: Optional[bool] = None
-    flakiness_reasons: Optional[List[str]] = None
-    timestamp: Optional[str] = None
+    status: str
+    error_line: Optional[int] = None
+    playwright_script: Optional[str] = None  # Clickable file:// URL with line number anchor (e.g., file:///path/to/file.js#L42)
+    test_url: Optional[str] = None  # Clickable URL of the page being tested (e.g., https://example.com/login)
     # Metadata fields (added when stored)
     id: Optional[str] = None
     created_at: Optional[str] = None
