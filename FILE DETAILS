@@ -1,0 +1,106 @@
+File Classification:
+
+CORE FILES (Essential for application functionality)
+Python Application Core:
+main.py
+ - Main entry point
+bert_server.py
+ - BERT classification server
+playwright_script_server.py
+ - Playwright script server
+app/
+init
+.py
+ - App package initialization
+app/main.py
+ - App main module
+app/schemas.py
+ - Data schemas/models
+API Layer:
+
+app/api/
+init
+.py
+app/api/routes.py
+ - API endpoints
+Services:
+
+app/services/
+init
+.py
+app/services/ollama_service.py
+ - LLM service integration
+app/services/playwright_label_detector.py
+ - Playwright test detection
+app/services/storage_service.py
+ - Data storage
+app/services/triage_service.py
+ - Core triage logic
+Utilities:
+
+app/utils/
+init
+.py
+app/utils/url_utils.py
+ - URL handling utilities
+Models:
+
+app/models/
+init
+.py
+Test Scripts:
+
+demo.spec.js
+ - Demo Playwright test
+tests/checkout.spec.js
+tests/login.spec.js
+tests/navigation.spec.js
+tests/profile.spec.js
+tests/search.spec.js
+Configuration:
+
+playwright.config.js
+ - Playwright configuration
+package.json
+ - Node.js dependencies
+package-lock.json
+ - Locked dependency versions
+MARKDOWN DOCUMENTATION FILES
+API_INPUT_FORMAT.md
+ - API usage documentation
+HOW_TO_GET_SCRIPTS.md
+ - Script retrieval guide
+KNOWLEDGE_TRANSFER.md
+ - Team knowledge transfer doc
+PLAYWRIGHT_SCRIPT_SERVER_SETUP.md
+ - Server setup guide
+RUNNING_TESTS.md
+ - Test execution guide
+RUN_ALL_TESTS.md
+ - Batch test execution guide
+SIMPLE_COMMAND.md
+ - Quick command reference
+SIMPLE_INSTRUCTIONS.md
+ - Basic instructions
+OPTIONAL/UTILITY FILES
+Helper Scripts:
+
+demo_playwright_failures.py
+ - Demo failure processing
+run_all_tests.py
+ - Test runner utility
+view_results.py
+ - Results viewer
+Text Files:
+
+QUICK_START.txt
+ - Quick start guide
+Generated/Runtime Files:
+
+playwright-report.json
+ - Test report output
+__pycache__/ - Python bytecode cache (multiple directories)
+test-results/ - Test execution results
+node_modules/ - Node.js dependencies
+venv/ - Python virtual environment
+.git/ - Git version control
